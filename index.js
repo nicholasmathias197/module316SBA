@@ -1,4 +1,4 @@
-// Complete JavaScript for Task Manager
+
 
 //TODO Cache at least one element using selectElementById.
 const taskForm = document.getElementById('task-form');
