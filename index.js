@@ -4,6 +4,12 @@
 const taskForm = document.getElementById('task-form');
 const taskList = document.getElementById('task-list');
 const emptyMessage = document.getElementById('empty-message');
+const taskCount = document.getElementById('task-count');
+const clearCompletedBtn = document.getElementById('clear-completed');
+const descriptionTextarea = document.getElementById('task-description');
+const descCount = document.getElementById('desc-count');
+const taskTemplate = document.getElementById('task-template');
+const titleInput = document.getElementById('task-title');
 
 //TODO Cache at least one element using querySelector or querySelectorAll.
 const filterButtons = document.querySelectorAll('.filter-btn');
@@ -12,98 +18,227 @@ const addTaskBtn = document.querySelector('#add-task-btn');
 // Task data storage
 let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
 let currentFilter = 'all';
+let editTaskId = null;
 
 // Initialize the app
+document.addEventListener('DOMContentLoaded', function() {
+    init();
+});
+
 function init() {
+    // Set minimum date for due date input to today
+    const dueDateInput = document.getElementById('task-due');
+    const today = new Date().toISOString().split('T')[0];
+    dueDateInput.min = today;
+    
+    // Add sample tasks if empty
+    if (tasks.length === 0) {
+        tasks = [
+            {
+                id: '1',
+                title: 'Welcome to Task Manager',
+                description: 'This is your first task. Try marking it as complete!',
+                priority: 'high',
+                dueDate: today,
+                completed: false,
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: '2',
+                title: 'Add more tasks',
+                description: 'Use the form above to add more tasks',
+                priority: 'medium',
+                dueDate: '',
+                completed: false,
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: '3',
+                title: 'Learn JavaScript',
+                description: 'Practice DOM manipulation and event handling',
+                priority: 'high',
+                dueDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0], // 7 days from now
+                completed: true,
+                createdAt: new Date().toISOString()
+            }
+        ];
+        saveTasks();
+    }
+    
     renderTasks();
     updateTaskCount();
+    updateDescriptionCharCount();
     setupEventListeners();
     
-    // BOM: Check screen size on load
+    //TODO Use at least two Browser Object Model (BOM) properties or methods.
+    // BOM 1: Get screen width
     console.log('Screen width:', window.innerWidth, 'px');
+    
+    // BOM 2: Get user agent
+    console.log('User agent:', navigator.userAgent);
 }
 
 // Setup all event listeners
 function setupEventListeners() {
-    //TODO Register at least two different event listeners and create the associated event handler functions.
-    // Form submission
-    taskForm.addEventListener('submit', handleFormSubmit);
+    // Event Listener 1: Form submission - FIXED
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleFormSubmit);
+    }
     
-    // Filter buttons
-    filterButtons.forEach(btn => {
-        btn.addEventListener('click', () => handleFilterClick(btn));
-    });
+    // Event Listener 2: Filter buttons - FIXED
+    if (filterButtons.length > 0) {
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                handleFilterClick(this);
+            });
+        });
+    }
     
     // Clear completed tasks
-    document.getElementById('clear-completed').addEventListener('click', clearCompletedTasks);
+    if (clearCompletedBtn) {
+        clearCompletedBtn.addEventListener('click', clearCompletedTasks);
+    }
     
     // Description character count
-    document.getElementById('task-description').addEventListener('input', updateDescriptionCharCount);
+    if (descriptionTextarea) {
+        descriptionTextarea.addEventListener('input', updateDescriptionCharCount);
+    }
     
     // Real-time form validation
-    const titleInput = document.getElementById('task-title');
-    titleInput.addEventListener('input', validateTitle);
+    if (titleInput) {
+        titleInput.addEventListener('input', validateTitle);
+    }
     
-    //TODO Use at least two Browser Object Model (BOM) properties or methods.
     // BOM: Save tasks before page unload
     window.addEventListener('beforeunload', () => {
         localStorage.setItem('tasks', JSON.stringify(tasks));
     });
 }
 
-// Form submission handler
+// Form submission handler - FIXED
 function handleFormSubmit(e) {
     e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Form submitted');
     
     if (!validateForm()) {
+        console.log('Form validation failed');
         return;
     }
     
     const formData = new FormData(taskForm);
-    const task = {
-        id: Date.now().toString(),
-        title: formData.get('title'),
-        description: formData.get('description'),
-        priority: formData.get('priority'),
-        dueDate: formData.get('dueDate'),
-        completed: false,
-        createdAt: new Date().toISOString()
-    };
+    const title = formData.get('title');
+    const description = formData.get('description');
+    const priority = formData.get('priority');
+    const dueDate = formData.get('dueDate');
     
-    tasks.push(task);
+    console.log('Creating task with:', { title, description, priority, dueDate });
+    
+    if (editTaskId) {
+        // Update existing task
+        const taskIndex = tasks.findIndex(t => t.id === editTaskId);
+        if (taskIndex !== -1) {
+            tasks[taskIndex] = {
+                ...tasks[taskIndex],
+                title: title,
+                description: description,
+                priority: priority,
+                dueDate: dueDate
+            };
+            
+            // Update submit button text back to "Add Task"
+            if (addTaskBtn) {
+                addTaskBtn.textContent = '➕ Add Task';
+            }
+            editTaskId = null;
+            showNotification('Task updated successfully!', 'success');
+        }
+    } else {
+        // Create new task
+        const task = {
+            id: Date.now().toString(),
+            title: title,
+            description: description,
+            priority: priority,
+            dueDate: dueDate,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+        
+        tasks.push(task);
+        showNotification('Task added successfully!', 'success');
+    }
+    
     saveTasks();
     renderTasks();
     updateTaskCount();
-    taskForm.reset();
+    
+    // Reset form
+    if (taskForm) {
+        taskForm.reset();
+    }
+    
     updateDescriptionCharCount();
+    
+    // Reset validation state
+    if (titleInput) {
+        const formGroup = titleInput.parentElement;
+        if (formGroup) {
+            formGroup.classList.remove('success');
+        }
+    }
+    
+    // Reset date to today
+    const dueDateInput = document.getElementById('task-due');
+    if (dueDateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dueDateInput.value = '';
+        dueDateInput.min = today;
+    }
+    
+    return false;
 }
 
-//TODO include at least one form and/or input with HTML attribute validation
-//TODO Include at least one form and/or input with DOM event-based validation.
+// Form validation
 function validateForm() {
-    const titleInput = document.getElementById('task-title');
+    if (!titleInput) return false;
+    
     const formGroup = titleInput.parentElement;
-    const errorMessage = formGroup.querySelector('.error-message');
+    const errorMessage = formGroup ? formGroup.querySelector('.error-message') : null;
     
     // Clear previous state
-    formGroup.classList.remove('error', 'success');
-    errorMessage.textContent = '';
+    if (formGroup) {
+        formGroup.classList.remove('error', 'success');
+    }
     
-    // HTML attribute validation (required, minlength) + DOM validation
+    if (errorMessage) {
+        errorMessage.textContent = '';
+    }
+    
+    // Validate required field
     if (!titleInput.value.trim()) {
-        formGroup.classList.add('error');
-        errorMessage.textContent = 'Title is required';
+        if (formGroup) formGroup.classList.add('error');
+        if (errorMessage) errorMessage.textContent = 'Title is required';
         return false;
     }
     
+    // Validate min length
     if (titleInput.value.trim().length < 3) {
-        formGroup.classList.add('error');
-        errorMessage.textContent = 'Title must be at least 3 characters';
+        if (formGroup) formGroup.classList.add('error');
+        if (errorMessage) errorMessage.textContent = 'Title must be at least 3 characters';
+        return false;
+    }
+    
+    // Validate max length
+    if (titleInput.value.trim().length > 50) {
+        if (formGroup) formGroup.classList.add('error');
+        if (errorMessage) errorMessage.textContent = 'Title cannot exceed 50 characters';
         return false;
     }
     
     // Success state
-    formGroup.classList.add('success');
+    if (formGroup) formGroup.classList.add('success');
     return true;
 }
 
@@ -113,36 +248,46 @@ function validateTitle(e) {
     const formGroup = titleInput.parentElement;
     const errorMessage = formGroup.querySelector('.error-message');
     
-    if (titleInput.value.trim().length < 3 && titleInput.value.trim().length > 0) {
+    formGroup.classList.remove('error', 'success');
+    errorMessage.textContent = '';
+    
+    if (titleInput.value.trim().length === 0) {
+        formGroup.classList.add('error');
+        errorMessage.textContent = 'Title is required';
+    } else if (titleInput.value.trim().length < 3) {
         formGroup.classList.add('error');
         errorMessage.textContent = 'Title must be at least 3 characters';
+    } else if (titleInput.value.trim().length > 50) {
+        formGroup.classList.add('error');
+        errorMessage.textContent = 'Title cannot exceed 50 characters';
     } else {
-        formGroup.classList.remove('error');
-        errorMessage.textContent = '';
+        formGroup.classList.add('success');
     }
 }
 
 // Update description character count
 function updateDescriptionCharCount() {
-    const description = document.getElementById('task-description');
-    const charCount = document.getElementById('desc-count');
-    const charCountElement = charCount.parentElement;
+    if (!descriptionTextarea || !descCount) return;
     
-    const length = description.value.length;
-    charCount.textContent = length;
+    const length = descriptionTextarea.value.length;
+    descCount.textContent = length;
     
-    //TODO Modify the style and/or CSS classes of an element in response to user interactions
-    charCountElement.classList.remove('warning', 'danger');
-    
-    if (length > 180) {
-        charCountElement.classList.add('danger');
-    } else if (length > 150) {
-        charCountElement.classList.add('warning');
+    const charCountElement = descCount.parentElement;
+    if (charCountElement) {
+        charCountElement.classList.remove('warning', 'danger');
+        
+        if (length > 180) {
+            charCountElement.classList.add('danger');
+        } else if (length > 150) {
+            charCountElement.classList.add('warning');
+        }
     }
 }
 
-// Filter button click handler
+// Filter button click handler - FIXED
 function handleFilterClick(button) {
+    console.log('Filter clicked:', button.dataset.filter);
+    
     //TODO Iterate over a collection of elements to accomplish some task.
     filterButtons.forEach(btn => {
         btn.classList.remove('active');
@@ -151,10 +296,16 @@ function handleFilterClick(button) {
     button.classList.add('active');
     currentFilter = button.dataset.filter;
     renderTasks();
+    updateTaskCount();
 }
 
-// Render tasks based on current filter
+// Render tasks based on current filter - FIXED
 function renderTasks() {
+    if (!taskList) return;
+    
+    console.log('Rendering tasks with filter:', currentFilter);
+    console.log('Total tasks:', tasks.length);
+    
     taskList.innerHTML = '';
     
     const filteredTasks = tasks.filter(task => {
@@ -163,65 +314,109 @@ function renderTasks() {
         return true;
     });
     
+    console.log('Filtered tasks:', filteredTasks.length);
+    
     if (filteredTasks.length === 0) {
-        emptyMessage.classList.remove('hidden');
+        if (emptyMessage) {
+            emptyMessage.classList.remove('hidden');
+        }
     } else {
-        emptyMessage.classList.add('hidden');
+        if (emptyMessage) {
+            emptyMessage.classList.add('hidden');
+        }
         
-        //TODO Use the DocumentFragment interface or HTML templating with the cloneNode method
         const fragment = document.createDocumentFragment();
         
         filteredTasks.forEach(task => {
-            //TODO Use the parent-child-sibling relationship to navigate between elements
-            const template = document.getElementById('task-template');
-            const taskElement = template.content.cloneNode(true);
+            if (!taskTemplate) return;
+            
+            const taskElement = taskTemplate.content.cloneNode(true);
             const li = taskElement.querySelector('.task-item');
             
-            //TODO Modify at least one attribute of an element in response to user interaction.
+            if (!li) return;
+            
+            // Set task ID
             li.dataset.id = task.id;
             
-            //TODO Modify the HTML or text content of at least one element
-            li.querySelector('.task-title').textContent = task.title;
-            li.querySelector('.task-description').textContent = task.description || '';
+            // Set task title
+            const titleElement = li.querySelector('.task-title');
+            if (titleElement) {
+                titleElement.textContent = task.title;
+            }
             
-            // Priority badge
-            const priorityBadge = li.querySelector('.task-priority-badge');
-            priorityBadge.textContent = task.priority;
-            priorityBadge.classList.add(task.priority);
-            
-            // Due date
-            const dueDateElement = li.querySelector('.task-due-date');
-            if (task.dueDate) {
-                const dueDate = new Date(task.dueDate);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                dueDateElement.textContent = `Due: ${dueDate.toLocaleDateString()}`;
-                
-                if (dueDate < today && !task.completed) {
-                    dueDateElement.classList.add('overdue');
+            // Set task description
+            const descriptionElement = li.querySelector('.task-description');
+            if (descriptionElement) {
+                if (task.description && task.description.trim()) {
+                    descriptionElement.textContent = task.description;
+                    descriptionElement.style.display = 'block';
+                } else {
+                    descriptionElement.style.display = 'none';
                 }
-            } else {
-                dueDateElement.textContent = 'No due date';
             }
             
-            //TODO Modify the style and/or CSS classes of an element
-            if (task.completed) {
-                li.classList.add('completed');
-                li.querySelector('.complete-checkbox').checked = true;
+            // Set priority badge
+            const priorityBadge = li.querySelector('.task-priority-badge');
+            if (priorityBadge) {
+                priorityBadge.textContent = task.priority;
+                priorityBadge.className = 'task-priority-badge ' + task.priority;
             }
             
-            // Event listeners for task actions
+            // Set due date
+            const dueDateElement = li.querySelector('.task-due-date');
+            if (dueDateElement) {
+                if (task.dueDate) {
+                    const dueDate = new Date(task.dueDate);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    dueDate.setHours(0, 0, 0, 0);
+                    
+                    dueDateElement.textContent = `Due: ${dueDate.toLocaleDateString()}`;
+                    
+                    if (dueDate < today && !task.completed) {
+                        dueDateElement.classList.add('overdue');
+                    } else {
+                        dueDateElement.classList.remove('overdue');
+                    }
+                } else {
+                    dueDateElement.textContent = 'No due date';
+                    dueDateElement.classList.remove('overdue');
+                }
+            }
+            
+            // Set completed state
             const completeCheckbox = li.querySelector('.complete-checkbox');
-            completeCheckbox.addEventListener('change', () => toggleTaskComplete(task.id));
+            if (completeCheckbox) {
+                completeCheckbox.checked = task.completed;
+                
+                if (task.completed) {
+                    li.classList.add('completed');
+                } else {
+                    li.classList.remove('completed');
+                }
+                
+                // Add event listener for completion toggle
+                completeCheckbox.addEventListener('change', function() {
+                    toggleTaskComplete(task.id);
+                });
+            }
             
+            // Add event listeners for edit and delete buttons
             const editBtn = li.querySelector('.btn-edit');
-            editBtn.addEventListener('click', () => editTask(task.id));
+            if (editBtn) {
+                editBtn.addEventListener('click', function() {
+                    editTask(task.id);
+                });
+            }
             
             const deleteBtn = li.querySelector('.btn-delete');
-            deleteBtn.addEventListener('click', () => deleteTask(task.id));
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function() {
+                    deleteTask(task.id);
+                });
+            }
             
-            fragment.appendChild(taskElement);
+            fragment.appendChild(li);
         });
         
         taskList.appendChild(fragment);
@@ -230,12 +425,16 @@ function renderTasks() {
 
 // Toggle task completion
 function toggleTaskComplete(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-        task.completed = !task.completed;
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+        tasks[taskIndex].completed = !tasks[taskIndex].completed;
         saveTasks();
         renderTasks();
         updateTaskCount();
+        
+        const task = tasks[taskIndex];
+        const status = task.completed ? 'completed' : 'active';
+        showNotification(`Task marked as ${status}!`, 'success');
     }
 }
 
@@ -244,99 +443,92 @@ function editTask(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    //TODO Create at least one element using createElement
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>Edit Task</h3>
-            <form id="edit-form">
-                <div class="form-group">
-                    <label for="edit-title">Title</label>
-                    <input type="text" id="edit-title" value="${task.title}" required>
-                </div>
-                <div class="form-group">
-                    <label for="edit-description">Description</label>
-                    <textarea id="edit-description">${task.description || ''}</textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" class="btn-cancel">Cancel</button>
-                    <button type="submit" class="btn-save">Save</button>
-                </div>
-            </form>
-        </div>
-    `;
+    editTaskId = taskId;
     
-    //TODO Use appendChild and/or prepend to add new elements to the DOM
-    document.body.appendChild(modal);
+    // Populate form with task data
+    if (titleInput) titleInput.value = task.title;
+    if (descriptionTextarea) descriptionTextarea.value = task.description || '';
     
-    //TODO Use the parent-child-sibling relationship to navigate between elements
-    const editForm = modal.querySelector('#edit-form');
-    const cancelBtn = modal.querySelector('.btn-cancel');
+    const prioritySelect = document.getElementById('task-priority');
+    if (prioritySelect) prioritySelect.value = task.priority;
     
-    editForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const titleInput = modal.querySelector('#edit-title');
-        const descriptionInput = modal.querySelector('#edit-description');
-        
-        //TODO Modify the HTML or text content of at least one element
-        task.title = titleInput.value;
-        task.description = descriptionInput.value;
-        
-        saveTasks();
-        renderTasks();
-        document.body.removeChild(modal);
-    });
+    const dueDateInput = document.getElementById('task-due');
+    if (dueDateInput) dueDateInput.value = task.dueDate || '';
     
-    cancelBtn.addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
+    // Change submit button text
+    if (addTaskBtn) {
+        addTaskBtn.textContent = '💾 Update Task';
+    }
     
-    // Close modal on outside click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
+    // Scroll to form
+    const formSection = document.querySelector('.task-form-section');
+    if (formSection) {
+        formSection.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+    
+    showNotification('Editing task... Click Update Task to save changes.', 'info');
 }
 
 // Delete task
 function deleteTask(taskId) {
-    //TODO Use the parent-child-sibling relationship to navigate between elements
     const taskElement = document.querySelector(`.task-item[data-id="${taskId}"]`);
-    if (taskElement) {
-        taskElement.style.transform = 'translateX(-100%)';
-        taskElement.style.opacity = '0';
-        
-        setTimeout(() => {
-            tasks = tasks.filter(t => t.id !== taskId);
-            saveTasks();
-            renderTasks();
-            updateTaskCount();
-        }, 300);
-    }
+    if (!taskElement) return;
+    
+    // Animate removal
+    taskElement.style.transform = 'translateX(-100%)';
+    taskElement.style.opacity = '0';
+    taskElement.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+    
+    setTimeout(() => {
+        tasks = tasks.filter(t => t.id !== taskId);
+        saveTasks();
+        renderTasks();
+        updateTaskCount();
+        showNotification('Task deleted successfully!', 'error');
+    }, 300);
 }
 
 // Clear completed tasks
 function clearCompletedTasks() {
-    tasks = tasks.filter(task => !task.completed);
-    saveTasks();
-    renderTasks();
-    updateTaskCount();
+    const completedCount = tasks.filter(t => t.completed).length;
+    
+    if (completedCount === 0) {
+        showNotification('No completed tasks to clear!', 'info');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to clear ${completedCount} completed task${completedCount > 1 ? 's' : ''}?`)) {
+        tasks = tasks.filter(task => !task.completed);
+        saveTasks();
+        renderTasks();
+        updateTaskCount();
+        showNotification(`Cleared ${completedCount} completed task${completedCount > 1 ? 's' : ''}!`, 'success');
+    }
 }
 
 // Update task count
 function updateTaskCount() {
+    if (!taskCount) return;
+    
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.completed).length;
     const activeTasks = totalTasks - completedTasks;
     
-    let countText = `${totalTasks} task${totalTasks !== 1 ? 's' : ''}`;
-    if (completedTasks > 0) {
-        countText += ` (${completedTasks} completed)`;
+    let countText;
+    if (currentFilter === 'all') {
+        countText = `${totalTasks} task${totalTasks !== 1 ? 's' : ''}`;
+        if (completedTasks > 0) {
+            countText += ` (${completedTasks} completed)`;
+        }
+    } else if (currentFilter === 'active') {
+        countText = `${activeTasks} active task${activeTasks !== 1 ? 's' : ''}`;
+    } else {
+        countText = `${completedTasks} completed task${completedTasks !== 1 ? 's' : ''}`;
     }
     
-    //TODO Modify the HTML or text content of at least one element
     taskCount.textContent = countText;
 }
 
@@ -345,64 +537,87 @@ function saveTasks() {
     localStorage.setItem('tasks', JSON.stringify(tasks));
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
+// Show notification
+function showNotification(message, type = 'info') {
+    // Remove any existing notification
+    const existingNotification = document.querySelector('.notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    // Apply styles
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 300px;
+    `;
+    
+    // Set background color based on type
+    if (type === 'success') {
+        notification.style.background = 'linear-gradient(135deg, #38a169 0%, #2f855a 100%)';
+    } else if (type === 'error') {
+        notification.style.background = 'linear-gradient(135deg, #e53e3e 0%, #c53030 100%)';
+    } else {
+        notification.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
 
-// Add some basic modal styles
+// Add animation styles
 const style = document.createElement('style');
 style.textContent = `
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
     }
     
-    .modal-content {
-        background: white;
-        padding: 25px;
-        border-radius: 12px;
-        width: 90%;
-        max-width: 400px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
     }
     
-    .modal h3 {
-        margin-bottom: 15px;
-        color: #333;
+    .task-item {
+        transition: all 0.3s ease;
     }
     
-    .modal-buttons {
-        display: flex;
-        gap: 10px;
-        margin-top: 20px;
-    }
-    
-    .modal-buttons button {
-        flex: 1;
-        padding: 10px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-    
-    .btn-cancel {
-        background: #e2e8f0;
-        color: #666;
-    }
-    
-    .btn-save {
-        background: #667eea;
-        color: white;
+    .notification {
+        font-family: inherit;
     }
 `;
 
-//TODO Use appendChild and/or prepend to add new elements to the DOM
 document.head.appendChild(style);
