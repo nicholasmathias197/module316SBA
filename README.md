@@ -1,0 +1,4 @@
+Task Manager App
+A simple, browser-based task management application that helps you organize your daily tasks. Create, edit, delete, and track tasks with priority levels, due dates, and completion status—all stored locally in your browser so your data stays private and persists between sessions.
+
+The app includes task filtering (all/active/completed), real-time validation, visual notifications, and sample tasks to get you started. Built with vanilla JavaScript, it works instantly in any modern browser without installation or external dependencies—just open the HTML file and start managing your tasks!
