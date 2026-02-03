@@ -80,12 +80,12 @@ function init() {
 
 // Setup all event listeners
 function setupEventListeners() {
-    // Event Listener 1: Form submission - FIXED
+    // Event Listener 1: Form submission 
     if (taskForm) {
         taskForm.addEventListener('submit', handleFormSubmit);
     }
     
-    // Event Listener 2: Filter buttons - FIXED
+    // Event Listener 2: Filter buttons 
     if (filterButtons.length > 0) {
         filterButtons.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -115,7 +115,7 @@ function setupEventListeners() {
     });
 }
 
-// Form submission handler - FIXED
+// Form submission handler 
 function handleFormSubmit(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -284,7 +284,7 @@ function updateDescriptionCharCount() {
     }
 }
 
-// Filter button click handler - FIXED
+// Filter button click handler 
 function handleFilterClick(button) {
     console.log('Filter clicked:', button.dataset.filter);
     
@@ -299,7 +299,7 @@ function handleFilterClick(button) {
     updateTaskCount();
 }
 
-// Render tasks based on current filter - FIXED
+// Render tasks based on current filter 
 function renderTasks() {
     if (!taskList) return;
     
